@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"crwen.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":true,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="&amp;emsp;进程是操作系统的核心，通过进程基本可以将操作系统的所有知识联系起来。而线程是一种轻量级的线程，学习线程对学习进程是很有帮助的。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线程切换">
+<meta property="og:url" content="http://crwen.github.io/2021/03/19/%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2/index.html">
+<meta property="og:site_name" content="crwen">
+<meta property="og:description" content="&amp;emsp;进程是操作系统的核心，通过进程基本可以将操作系统的所有知识联系起来。而线程是一种轻量级的线程，学习线程对学习进程是很有帮助的。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://cdn.jsdelivr.net/gh/crwen/img/blog/wrong_schedule.png">
+<meta property="article:published_time" content="2021-03-18T16:45:41.000Z">
+<meta property="article:modified_time" content="2021-03-20T06:11:28.817Z">
+<meta property="article:author" content="crwen">
+<meta property="article:tag" content="操作系统">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://cdn.jsdelivr.net/gh/crwen/img/blog/wrong_schedule.png">
+
+<link rel="canonical" href="http://crwen.github.io/2021/03/19/%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>线程切换 | crwen</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="crwen" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">crwen</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://crwen.github.io/2021/03/19/%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/ushio.jpg">
+      <meta itemprop="name" content="crwen">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="crwen">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          线程切换
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-19 00:45:41" itemprop="dateCreated datePublished" datetime="2021-03-19T00:45:41+08:00">2021-03-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-03-20 14:11:28" itemprop="dateModified" datetime="2021-03-20T14:11:28+08:00">2021-03-20</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">操作系统</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>&emsp;进程是操作系统的核心，通过进程基本可以将操作系统的所有知识联系起来。而线程是一种轻量级的线程，学习线程对学习进程是很有帮助的。</p>
+<span id="more"></span>
+
+<p>&emsp;首先我们思考一个问题：计算机运行为什么需要多线程呢？</p>
+<ul>
+<li>首先，人们希望一个进程在同一时间不是执行一个任务。比如 QQ 在上传文件的同时，还需要确保能够正常聊天</li>
+<li>其次，多线程让程序的结构变得简单。线程在有些场合可以帮助程序员以简单优雅的方式进程组织，并减少复杂度</li>
+<li>最后，使用多线程可以实现并行运算，在多核 CPU 中可以加快处理的速度。</li>
+</ul>
+<h2 id="user-kernel-mode"><a href="#user-kernel-mode" class="headerlink" title="user/kernel mode"></a>user/kernel mode</h2><p>&emsp;处理器有两种模式，一种是 user mode，第二种是 kernel mode。当运行在 kernel mode 时，CPU 可以运行<strong>特权指令</strong>（privileged instructions）；当运行在 user mode 时，CPU 只能运行普通指令，即<strong>非特权指令</strong>。</p>
+<p>&emsp;普通指令指的是像 ADD、SUB、JRC、BRANCH 这样所有应用程序都允许执行的指令。而特权指令主要是一些直接操纵硬件的指令和设置保护的指令，比如设置 page table 寄存器、关闭时钟中断等。</p>
+<p>&emsp;在处理器中有一个 flag 用来标志指令是否是特权指令。同时处理器中有一个 bit，用来标识是 user mode 还是 kernel mode。当处理器解析指令时，如果发现 user mode 尝试执行特权指令，处理器会拒绝执行这条指令。</p>
+<p>&emsp;现在，我们知道当应用程序尝试执行特权指令时会被处理器拒绝掉，而且如果想要修改处理器中的 bit 位也需要执行特权指令，那么如何才能让应用程序执行内核才能执行的内核指令呢？</p>
+<p>&emsp;如果用户空间尝试执行一条特权指令，用户程序会通过<strong>系统调用</strong>来切换到 kernel mode。当用户程序执行系统调用时，会通过 <code>syscall</code> 触发一个<strong>软中断</strong>（software interrupt），让程序陷入内核天。软中断会查询操作系统预先设定的<strong>中断向量表</strong>，并执行中断向量表中包含的<strong>中断处理程序</strong>。中断处理程序在内核中，这样就完成了 user mode 到 kernel mode 的切换，并执行用户程序想要执行的特权指令。</p>
+<blockquote>
+<p>ECALL 可以让应用程序将控制权转移给内核。它接收一个数字，岱庙应用程序想要调用的系统调用。</p>
+</blockquote>
+<p>比如 ls 程序运行的时候，会调用 <code>read/write</code> 系统调用，Shell 程序会调用 fork 或者 exec 系统调用</p>
+<h2 id="线程模型"><a href="#线程模型" class="headerlink" title="线程模型"></a>线程模型</h2><h3 id="多对一模型"><a href="#多对一模型" class="headerlink" title="多对一模型"></a>多对一模型</h3><p>用户态进程的多线程复用一个内核线程，这样极大地减少了创建内核态线程的成本，但是线程不能并发。因此很少使用。</p>
+<h3 id="一对一模型"><a href="#一对一模型" class="headerlink" title="一对一模型"></a>一对一模型</h3><p>一对多模型是为每个用户态的线程分配一个单独的内核态线程。在这种情况下，每个用户态线程都需要通过系统调用创建一个绑定的内核线程。这种模型允许所有线程并发执行，能够充分利用多核优势，但是因为线程比较多，对内核调度的压力明显增加。</p>
+<h3 id="多对多模型"><a href="#多对多模型" class="headerlink" title="多对多模型"></a>多对多模型</h3><p>多对多模型会为 n 个用户态线程分配 m 个体内核态线程。m 通常小于 n，一般 m 为核数。这种关系减少了内核线程，同时保证了多核心并发</p>
+<h2 id="线程切换"><a href="#线程切换" class="headerlink" title="线程切换"></a>线程切换</h2><p>假设我们有两个线程分别执行下面两段程序</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">100</span>: <span class="built_in">A</span>() &#123;</span><br><span class="line">	<span class="built_in">B</span>();<span class="number">104</span>:</span><br><span class="line">&#125;</span><br><span class="line"><span class="number">200</span>: <span class="built_in">B</span>() &#123;</span><br><span class="line">	<span class="built_in">yield</span>();<span class="number">204</span>:</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">300</span>: <span class="built_in">C</span>() &#123;</span><br><span class="line">	<span class="built_in">D</span>();<span class="number">304</span>:</span><br><span class="line">&#125;</span><br><span class="line"><span class="number">400</span>: <span class="built_in">D</span>() &#123;</span><br><span class="line">	<span class="built_in">yield</span>();<span class="number">404</span>:</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们做出如下规定：</p>
+<ul>
+<li><code>100: A()</code> 表示 A 方法的地址为 400；</li>
+<li><code>B();104:</code> 表示 B 方法返回的地址，即压入栈帧中的地址</li>
+<li><code>yield()</code> 表示线程切换</li>
+</ul>
+<p>所以，为了了解线程切换，我们只需要了解 <code>yield</code> 函数应该如何实现。为了方便说明，我们将上面的线程称之为线程 A，将下面的线程称之为线程 B。</p>
+<h3 id="用户线程之间切换"><a href="#用户线程之间切换" class="headerlink" title="用户线程之间切换"></a>用户线程之间切换</h3><p>我们先来模拟一下函数的执行过程。</p>
+<p>首先 A() 方法中调用 B() 方法，此时会将 B 方法的返回地址 104 压栈，然后执行 B 方法。B 方法调用 yield() 方法进行方法切换，将返回地址 204 压栈，然后执行 yield() 方法。</p>
+<p>我们的目标是通过线程 A 的 yield() 方法，让线程 A 的 B() 方法跳转到线程 B 的 C() 方法中执行。我们初步可以实现下面这行代码</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="function"><span class="title">yield</span>(<span class="params"></span>)</span> &#123;</span><br><span class="line">	找到 <span class="number">300</span>;</span><br><span class="line">	jmp <span class="number">300</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们现在继续模拟。程序跳转到 300:C() 方法后，将 D() 方法的地址 304 压栈，执行 D() 方法，然后调用 <code>yield()</code> 方法，将地址 404 压栈，切换到线程 A。</p>
+<p>对于线程 B 的 yield() 方法，我们可以这样编写</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="function"><span class="title">yield</span>(<span class="params"></span>)</span> &#123;</span><br><span class="line">	找到 <span class="number">204</span>;</span><br><span class="line">	jmp <span class="number">204</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>现在栈的状态如下图所示</p>
+<p><img src="https://cdn.jsdelivr.net/gh/crwen/img/blog/wrong_schedule.png" alt="image"></p>
+<p>线程 B 的 yield() 方法会跳到 204 执行，然后遇到右大括号，执行 <code>ret</code> 指令弹栈，回将栈顶的 404 弹栈，结果又回到了 D() 方法中，遇到右大括号，又回到 C() 方法中继续执行。这样就出现了问题。</p>
+<p>为什么会产生问题呢？因为两个线程共用了一个栈。所以为了解决问题，每个线程都应该分配一个栈。当执行完 D() 中的 yield() 方法时，两个线程的线程栈应该处于如下状态</p>
+<figure class="highlight gherkin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">|<span class="string">104</span>|<span class="string">  		</span>|<span class="string">304</span>|</span><br><span class="line">|<span class="string">204</span>|<span class="string">  		</span>|<span class="string">404</span>|</span><br><span class="line">-----  		-----</span><br></pre></td></tr></table></figure>
+
+<p>此时我们执行线程 B 的 yield() 方法时需要切换线程栈，代码的大致流程如下</p>
+<figure class="highlight reasonml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">void yield<span class="literal">()</span> &#123;</span><br><span class="line">	<span class="module-access"><span class="module"><span class="identifier">TCB_B</span>.</span></span>esp = esp;</span><br><span class="line">	esp = <span class="module-access"><span class="module"><span class="identifier">TCB_A</span>.</span></span>esp;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>此时又轮到线程 A 执行，线程 A 遇到 B() 方法的右大括号，将 204 弹栈，回到 A() 方法，向下执行，接着弹栈。</p>
+<p>由此我们可以得出一个结论，<strong>每个线程都拥有一个栈，切换线程的时候线程栈也需要切换</strong>。</p>
+<p>光有线程栈还不够，我们还需要有一个设备存储当前线程执行指令的为止，方便执行下一条指令。这个设备叫做程序计数器。同时，我们还需要有一些寄存器，用来保存变量，以方便线程切换回来后可以准确地继续执行。以上这些信息都会存储到线程的 TCB 中，线程切换时，只需要切换线程的 TCB 即可。</p>
+<p>通过上面内容，我们知道 TCB 中会包含如下内容：</p>
+<ul>
+<li>程序计数器 PC，标识当前线程执行指令的为止</li>
+<li>保存变量的寄存器</li>
+<li>线程栈，记录函数调用的记录，并反映了当前线程的执行点</li>
+</ul>
+<h3 id="内核线程切换"><a href="#内核线程切换" class="headerlink" title="内核线程切换"></a>内核线程切换</h3><p>通过上面对 user mode 和 kernel mode 的介绍，我们知道，如果想要使用特权指令，就需要使用系统调用，进入内核态，即需要从用户态线程切换到内核态线程。</p>
+<p>如果程序执行了一个系统调用或者因为响应中断走到了内核中，那么相应的内核线程就会被激活。这个切换过程被称之为 上下文切换。在上下问切换前，我们需要保存线程上下文，即保存线程栈、寄存器等信息。之后 CPU 就会被切换到内核栈上运行，内核会运行一段时间处理系统调用或者执行中断处理程序。在处理完成之后返回用户空间时，又会使用之前保存的线程上下文来恢复用户线程状态。</p>
+<p>如果我们需要从一个进程的线程切换到另一个进程的线程，那么我们需要先从进程的用户级线程切换到进程的内核级线程，再从进程的内核级线程切换到另一个进程的内核线程。之后在第二个进程的内核线程中返回到第二个进程的用户及线程。在这个切换中，在用户栈切换的同时，内核栈也跟着切换了。这个切换涉及到了进程的切换，所以还需要切换进程的映射表等信息。</p>
+<p>【参考资料】</p>
+<p><a target="_blank" rel="noopener" href="https://pdos.csail.mit.edu/6.828/2020/schedule.html">MIT 操作系统</a></p>
+<p><a target="_blank" rel="noopener" href="http://www.icourse163.org/course/HIT-1002531008">哈工大 操作系统 李治军</a></p>
+
+    </div>
+
+    
+    
+    
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>crwen
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://crwen.github.io/2021/03/19/%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2/" title="线程切换">http://crwen.github.io/2021/03/19/线程切换/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" rel="tag"><i class="fa fa-tag"></i><i class="fa fa-tag"></i> 操作系统</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/18/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" rel="prev" title="虚拟内存">
+      <i class="fa fa-chevron-left"></i> 虚拟内存
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/19/%E4%B8%AD%E6%96%AD%E6%9C%BA%E5%88%B6/" rel="next" title="中断机制">
+      中断机制 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#user-kernel-mode"><span class="nav-number">1.</span> <span class="nav-text">user&#x2F;kernel mode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">线程模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E5%AF%B9%E4%B8%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">多对一模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E5%AF%B9%E4%B8%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.2.</span> <span class="nav-text">一对一模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E5%AF%B9%E5%A4%9A%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.3.</span> <span class="nav-text">多对多模型</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2"><span class="nav-number">3.</span> <span class="nav-text">线程切换</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E7%BA%BF%E7%A8%8B%E4%B9%8B%E9%97%B4%E5%88%87%E6%8D%A2"><span class="nav-number">3.1.</span> <span class="nav-text">用户线程之间切换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E6%A0%B8%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2"><span class="nav-number">3.2.</span> <span class="nav-text">内核线程切换</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="crwen"
+      src="/images/ushio.jpg">
+  <p class="site-author-name" itemprop="name">crwen</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/crwen" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;crwen" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+  <div class="cc-license motion-element" itemprop="license">
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" class="cc-opacity" rel="noopener" target="_blank"><img src="/images/cc-by-nc-sa.svg" alt="Creative Commons"></a>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">crwen</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  
+  <script color='0,0,0' opacity='0.5' zIndex='-1' count='150' src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '0ee1f35cad06d9f38ff2',
+      clientSecret: '66a552f608221a103cf2e0f5f4ca5f56799c9248',
+      repo        : 'crwen.github.io',
+      owner       : 'crwen',
+      admin       : ['crwen'],
+      id          : '4fa337acd9a748fafd84cb736a34d69c',
+        language: '',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"model":{"jsonPath":"/live2dw/assets/wanko.model.json"},"display":{"position":"right","width":150,"height":300},"mobile":{"show":false},"log":false});</script></body>
+<!-- 页面点击小红心 -->
+<script type="text/javascript" src="/js/src/clicklove.js"></script>
+</html>
