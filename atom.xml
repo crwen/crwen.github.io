@@ -6,7 +6,7 @@
   <link href="http://crwen.github.io/atom.xml" rel="self"/>
   
   <link href="http://crwen.github.io/"/>
-  <updated>2021-07-15T12:59:27.293Z</updated>
+  <updated>2021-08-01T15:04:22.026Z</updated>
   <id>http://crwen.github.io/</id>
   
   <author>
@@ -15,6 +15,32 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>函数调用过程</title>
+    <link href="http://crwen.github.io/2021/08/01/%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B/"/>
+    <id>http://crwen.github.io/2021/08/01/%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B/</id>
+    <published>2021-08-01T15:02:33.000Z</published>
+    <updated>2021-08-01T15:04:22.026Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="过程调用"><a href="#过程调用" class="headerlink" title="过程调用"></a>过程调用</h1><h2 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h2><p>&emsp;对于一个过程(函数/方法)，必须要支持下面一个或多个机制：</p><ul><li>传递控制：自动更新程序计数器 PC 的值</li><li>传递数据：提供参数传递和结果返回功能</li><li>分配和释放内存：提供内存的分配和释放机制</li></ul><span id="more"></span><h3 id="传递控制"><a href="#传递控制" class="headerlink" title="传递控制"></a>传递控制</h3><p>&emsp;在传递控制部分，我们需要做的事情是自动更新程序计数器 PC 的值，让程序能够按照正确的顺序执行。要做到自动更新 PC 的值，我们需要做到下面两点：</p><ol><li>调用过程前将返回地址压栈，以便被调过程返回时能够继续执行。同时将 PC 的值设置为被调函数的首地址值，以便程序能够执行被调函数</li><li>被调函数返回时，将返回地址弹栈，并将 PC 的值设置为这个返回地址，以便程序能从调用位置够继续执行</li></ol><p>&emsp;在 x86-64 中，分别使用 <code>call</code> 指令和 <code>ret</code> 指令来实现这两个功能。</p><h3 id="数据传递"><a href="#数据传递" class="headerlink" title="数据传递"></a>数据传递</h3><p>在过程的调用过程中，后调用的过程一般会先执行完毕，所有程序一般都会使用栈作为数据结构来管理内存。一个过程可能会有许多信息，这部分信息也需要存储在栈上，这一部分称之为栈帧。一个通用栈帧示意图如下图所示。</p><img src="/2021/08/01/%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B/Users\crwen\AppData\Roaming\Typora\typora-user-images\image-20210801230050062.png" alt="image-20210801230050062" style="zoom:67%;"><h4 id="参数传递"><a href="#参数传递" class="headerlink" title="参数传递"></a>参数传递</h4><p>&emsp;在 x86-64 中，可以通过寄存器最多传递 6 个整型参数，而这些寄存器是有顺序。过程中传递的参数依次存放到寄存器 %rdi、%rsi、%rdx、%rcx、%r8、%r9 中。如果一个函数有大于6 个整型参数，超出 6 个的部分需要通过栈来传递，并且这些数据大小都需要向 8 的倍数对齐。如果在过程中调用了某个超过了 6 个参数的函数，则需要在栈帧中为超过 6 个部分的参数分配过程，这一部分称之为“参数构造区”。</p><p>&emsp;对于下面的程序，函数 proc 接受 8 个参数，包括字节数不同的整数和不同类型的指针。</p><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">proc</span><span class="params">(<span class="keyword">long</span>  a1, <span class="keyword">long</span>    *a1p,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">int</span>     a2, <span class="keyword">int</span>     *a2p,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">short</span>   a3, <span class="keyword">short</span>   *a3p,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">char</span>    a4, <span class="keyword">char</span>    *a4p)</span> </span>&#123;</span><br><span class="line">    *a1p += a1;</span><br><span class="line">    *a2p += a2;</span><br><span class="line">    *a3p += a3;</span><br><span class="line">    *a4p += a4;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>&emsp;我们查看汇编代码（原始的、为被优化的代码，并且只保留了重要部分）</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">proc:</span><br><span class="line">.LFB0:</span><br><span class="line">movq16(%rsp), %rax; 将 a4 放入 %rax 中</span><br><span class="line">addq%rdi, (%rsi)   ; *a1p +&#x3D; a1</span><br><span class="line">addl%edx, (%rcx)  ; *a2p +&#x3D; a2</span><br><span class="line">addw%r8w, (%r9); *a3p +&#x3D; a3</span><br><span class="line">movl8(%rsp), %edx; 将 a4 存放到 %edx 中</span><br><span class="line">addb%dl, (%rax) ; *a4p +&#x3D; a4</span><br><span class="line">ret</span><br></pre></td></tr></table></figure><p>&emsp;从汇编代码中可以看出，参数 a1, *a1p, a2, *a2p, a3, *a3p 分别存放在寄存器 %rdi、%rsi、%rdx、%rcx、%r8、%r9 中。而我们通过 <code>8(%rsp)</code> 和 <code>16(%rsp)</code> 分别访问了 a4 和 *a4，并且我们发现这两个参数在栈中是逆序存储的。由此可以证明，过程的前 6 个整型参数是通过寄存器传递的，而超过 6 个的部分是通过栈来存储的。</p><blockquote><p>&emsp;在 x86-32 中没有使用寄存器来传递参数，所有参数都需要在栈上分配。可以通过 -m32 来指定编译为 32 位机器上的代码，然后查看汇编代码来验证。也可以通过<a href="https://blog.csdn.net/u010039418/article/details/85275211">这篇博客</a>了解</p></blockquote><p>&emsp;既然参数会使用寄存器存储，而且通用寄存器是公用的，那么如果我们在被调用函数中改变了寄存器中的值会影响参数原本的值吗。根据我们的经验，值传递是不会改变变量原来的值的。那么程序是如何做到这一点的呢？</p><p>&emsp;要想保证值不被其他函数修改，只有两种方法</p><ol><li>在调用函数前保存一份，函数返回后恢复，这种方式被称为<strong>调用者保存</strong></li><li>在被调函数中保存，返回前恢复，这种方式被称为<strong>被调用者保存</strong></li></ol><p>&emsp;在 x86 中，通用寄存器被划分为调用者保存和被调用者保存两类，其中寄存器 %rbx、%rbp 和 %r12~%15 是被调用者保存，其他寄存器位调用者保存。在需要保存寄存器中的值的时候，这些值也是保存在栈上的。</p><h4 id="局部变量存储"><a href="#局部变量存储" class="headerlink" title="局部变量存储"></a>局部变量存储</h4><p>&emsp;对于过程中的局部变量，有些可以直接使用寄存器存取，但是有些变量需要存储在栈上，常见的情况包括：</p><ul><li>寄存器不足够存放所有的本地数据</li><li>对一个局部变量使用取地址运算符 &amp;，这时不能能够为它产生一个地址</li><li>某些局部变量数组或结构</li></ul><h2 id="数组分配和访问"><a href="#数组分配和访问" class="headerlink" title="数组分配和访问"></a>数组分配和访问</h2><p>&emsp;在 C 语言中，数组是一种将标量数据聚集程更大数据类型的方式，也就是说数组中的元素是分配在一块连续的内存空间中的。</p><p>&emsp;对于数据类型 T ，有一维数组 <code>T A[N]; </code>，假设数组首地址为 X<sub>A</sub>，则数组中第 i 个元素存放在 X<sub>A</sub> + L * i 中（L 为 数据类型 T 的大小）。如果有二维数组 <code>T A[M][N]</code>，则数组元素 <code>A[i][j]</code> 计算地址的方式为 X<sub>A</sub> + L (N * i + j)。也就是说数组元素是按照“行优先”的顺序存放的。</p><p><strong>参考资料</strong></p><p>[深入理解计算机系统](<a href="https://book.douban.com/subject/26912767/">深入理解计算机系统（原书第3版） (豆瓣) (douban.com)</a>)</p><p><a href="https://blog.csdn.net/u010039418/article/details/85275211">Linux X86架构参数传递规则</a></p>]]></content>
+    
+    
+    <summary type="html">&lt;h1 id=&quot;过程调用&quot;&gt;&lt;a href=&quot;#过程调用&quot; class=&quot;headerlink&quot; title=&quot;过程调用&quot;&gt;&lt;/a&gt;过程调用&lt;/h1&gt;&lt;h2 id=&quot;过程&quot;&gt;&lt;a href=&quot;#过程&quot; class=&quot;headerlink&quot; title=&quot;过程&quot;&gt;&lt;/a&gt;过程&lt;/h2&gt;&lt;p&gt;&amp;emsp;对于一个过程(函数/方法)，必须要支持下面一个或多个机制：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;传递控制：自动更新程序计数器 PC 的值&lt;/li&gt;
+&lt;li&gt;传递数据：提供参数传递和结果返回功能&lt;/li&gt;
+&lt;li&gt;分配和释放内存：提供内存的分配和释放机制&lt;/li&gt;
+&lt;/ul&gt;</summary>
+    
+    
+    
+    <category term="CS" scheme="http://crwen.github.io/categories/CS/"/>
+    
+    
+    <category term="CS" scheme="http://crwen.github.io/tags/CS/"/>
+    
+  </entry>
   
   <entry>
     <title>Rust 基础语法</title>
